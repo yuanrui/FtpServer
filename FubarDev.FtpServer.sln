@@ -9,6 +9,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 	ProjectSection(SolutionItems) = preProject
 		.dockerignore = .dockerignore
 		.editorconfig = .editorconfig
+		azure-pipelines.yml = azure-pipelines.yml
 		FubarDev.FtpServer.ruleset = FubarDev.FtpServer.ruleset
 		Global.props = Global.props
 		LICENSE.md = LICENSE.md
@@ -59,14 +60,19 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestFtpServer.Shell", "samp
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestFtpServer.Api", "samples\TestFtpServer.Api\TestFtpServer.Api.csproj", "{02D103B2-B9CA-4A7F-AB79-6FEC68C62B47}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuickStart.GenericHost", "samples\QuickStart.GenericHost\QuickStart.GenericHost.csproj", "{23752176-0F1A-4352-B677-CD7878B7E8FC}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuickStart.GenericHost", "samples\QuickStart.GenericHost\QuickStart.GenericHost.csproj", "{23752176-0F1A-4352-B677-CD7878B7E8FC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuickStart.AspNetCoreHost", "samples\QuickStart.AspNetCoreHost\QuickStart.AspNetCoreHost.csproj", "{D03594D1-84CC-4B55-A56D-20ED446CFDB1}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuickStart.AspNetCoreHost", "samples\QuickStart.AspNetCoreHost\QuickStart.AspNetCoreHost.csproj", "{D03594D1-84CC-4B55-A56D-20ED446CFDB1}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FubarDev.FtpServer.FileSystem.S3", "src\FubarDev.FtpServer.FileSystem.S3\FubarDev.FtpServer.FileSystem.S3.csproj", "{220D3222-EDF4-4E2D-BEE7-7E0C22F39A3E}"
+EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "ReadLine", "third-party\ReadLine\ReadLine.shproj", "{F68F448F-E8A4-4536-9A83-12018B6294B0}"
 EndProject
 Global
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
 		src\FubarDev.FtpServer.Shared\FubarDev.FtpServer.Shared.projitems*{52126b62-de83-4597-a832-d144f9a5a870}*SharedItemsImports = 13
 		third-party\DotNet.Glob\DotNet.Glob.projitems*{a45290b4-20f7-48e9-8543-c69240bfb9f8}*SharedItemsImports = 13
+		third-party\ReadLine\ReadLine.projitems*{f68f448f-e8a4-4536-9a83-12018b6294b0}*SharedItemsImports = 13
 		third-party\GnuSslStream\GnuSslStream.projitems*{fd524518-e097-4ac0-aac8-d5ea24f31545}*SharedItemsImports = 13
 	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -134,6 +140,10 @@ Global
 		{D03594D1-84CC-4B55-A56D-20ED446CFDB1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D03594D1-84CC-4B55-A56D-20ED446CFDB1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D03594D1-84CC-4B55-A56D-20ED446CFDB1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{220D3222-EDF4-4E2D-BEE7-7E0C22F39A3E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{220D3222-EDF4-4E2D-BEE7-7E0C22F39A3E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{220D3222-EDF4-4E2D-BEE7-7E0C22F39A3E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{220D3222-EDF4-4E2D-BEE7-7E0C22F39A3E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -159,6 +169,8 @@ Global
 		{02D103B2-B9CA-4A7F-AB79-6FEC68C62B47} = {7004709E-5C0D-4D3E-AF27-89968FA47C19}
 		{23752176-0F1A-4352-B677-CD7878B7E8FC} = {7004709E-5C0D-4D3E-AF27-89968FA47C19}
 		{D03594D1-84CC-4B55-A56D-20ED446CFDB1} = {7004709E-5C0D-4D3E-AF27-89968FA47C19}
+		{220D3222-EDF4-4E2D-BEE7-7E0C22F39A3E} = {A3AF1D22-494F-42F3-8DA5-CC2FD3391798}
+		{F68F448F-E8A4-4536-9A83-12018B6294B0} = {441F13FB-D457-402E-8DAC-4B6485AFCE30}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {DAA7D00E-C61D-4640-A54E-D307E4682263}

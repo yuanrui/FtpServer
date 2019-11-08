@@ -49,6 +49,13 @@ namespace TestFtpServer
             this IServiceCollection services,
             FtpOptions options)
         {
+            static TimeSpan? ToTomeSpan(int? seconds)
+            {
+                return seconds == null
+                    ? (TimeSpan?)null
+                    : TimeSpan.FromSeconds(seconds.Value);
+            }
+
             services
                .Configure<AuthTlsOptions>(
                     opt =>
@@ -56,13 +63,20 @@ namespace TestFtpServer
                         opt.ServerCertificate = options.GetCertificate();
                         opt.ImplicitFtps = options.Ftps.Implicit;
                     })
-               .Configure<FtpConnectionOptions>(opt => opt.DefaultEncoding = Encoding.ASCII)
+               .Configure<FtpConnectionOptions>(
+                    opt =>
+                    {
+                        opt.DefaultEncoding = Encoding.ASCII;
+                        opt.InactivityTimeout = ToTomeSpan(options.Server.InactivityTimeout);
+                    })
                .Configure<FubarDev.FtpServer.FtpServerOptions>(
                     opt =>
                     {
                         opt.ServerAddress = options.Server.Address;
                         opt.Port = options.GetServerPort();
                         opt.MaxActiveConnections = options.Server.MaxActiveConnections ?? 0;
+                        opt.ConnectionInactivityCheckInterval =
+                            ToTomeSpan(options.Server.ConnectionInactivityCheckInterval);
                     })
                .Configure<PortCommandOptions>(
                     opt =>
@@ -83,6 +97,14 @@ namespace TestFtpServer
                     })
                .Configure<PasvCommandOptions>(opt => opt.PromiscuousPasv = options.Server.Pasv.Promiscuous)
                .Configure<GoogleDriveOptions>(opt => opt.UseBackgroundUpload = options.GoogleDrive.BackgroundUpload)
+               .Configure<FileSystemAmazonS3Options>(
+                    opt =>
+                    {
+                        opt.BucketName = options.AmazonS3.BucketName;
+                        opt.BucketRegion = options.AmazonS3.BucketRegion;
+                        opt.AwsAccessKeyId = options.AmazonS3.AwsAccessKeyId;
+                        opt.AwsSecretAccessKey = options.AmazonS3.AwsSecretAccessKey;
+                    })
                .Configure<PamMembershipProviderOptions>(
                     opt => opt.IgnoreAccountManagement = options.Pam.NoAccountManagement);
 
@@ -142,6 +164,10 @@ namespace TestFtpServer
                        .CreateScoped(DriveService.Scope.Drive, DriveService.Scope.DriveFile);
                     services = services
                        .AddFtpServer(sb => sb.ConfigureAuthentication(options).UseGoogleDrive(serviceCredential));
+                    break;
+                case FileSystemType.AmazonS3:
+                    services = services
+                       .AddFtpServer(sb => sb.ConfigureAuthentication(options).UseS3FileSystem());
                     break;
                 default:
                     throw new NotSupportedException(
