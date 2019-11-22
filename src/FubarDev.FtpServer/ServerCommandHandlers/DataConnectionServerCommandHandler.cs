@@ -42,7 +42,7 @@ namespace FubarDev.FtpServer.ServerCommandHandlers
             var serverCommandWriter = connection.Features.Get<IServerCommandFeature>().ServerCommandWriter;
             var localizationFeature = connection.Features.Get<ILocalizationFeature>();
 
-            using (new ConnectionKeepAlive(connection))
+            using (new ConnectionKeepAlive(connection, command.Command))
             {
                 // Try to open the data connection
                 IFtpDataConnection dataConnection;
@@ -71,16 +71,20 @@ namespace FubarDev.FtpServer.ServerCommandHandlers
                     cancellationToken);
                 var response =
                     commandResponse
-                    ?? new FtpResponse(250, localizationFeature.Catalog.GetString("Closing data connection."));
+                    ?? new FtpResponse(226, localizationFeature.Catalog.GetString("Closing data connection."));
+
+                // We have to leave the connection open if the response code is 250.
+                if (response.Code != 250)
+                {
+                    // Close the data connection.
+                    await serverCommandWriter
+                       .WriteAsync(new CloseDataConnectionServerCommand(dataConnection), cancellationToken)
+                       .ConfigureAwait(false);
+                }
 
                 // Send the response.
                 await serverCommandWriter
                    .WriteAsync(new SendResponseServerCommand(response), cancellationToken)
-                   .ConfigureAwait(false);
-
-                // Close the data connection.
-                await serverCommandWriter
-                   .WriteAsync(new CloseDataConnectionServerCommand(dataConnection), cancellationToken)
                    .ConfigureAwait(false);
             }
         }
@@ -90,10 +94,12 @@ namespace FubarDev.FtpServer.ServerCommandHandlers
             private readonly string _transferId = Guid.NewGuid().ToString("N");
             private readonly IFtpConnectionEventHost _eventHost;
 
-            public ConnectionKeepAlive(IFtpConnection connection)
+            public ConnectionKeepAlive(
+                IFtpConnection connection,
+                FtpCommand command)
             {
                 _eventHost = connection.Features.Get<IFtpConnectionEventHost>();
-                _eventHost.PublishEvent(new FtpConnectionDataTransferStartedEvent(_transferId));
+                _eventHost.PublishEvent(new FtpConnectionDataTransferStartedEvent(_transferId, command));
             }
 
             /// <inheritdoc />

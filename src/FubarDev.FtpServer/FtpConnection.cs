@@ -206,7 +206,8 @@ namespace FubarDev.FtpServer
                     socketPipe,
                     connectionPipe,
                     sslStreamWrapperFactory,
-                    _cancellationTokenSource.Token),
+                    _cancellationTokenSource.Token,
+                    loggerFactory),
                 applicationOutputPipe.Writer);
 
             parentFeatures.Set<IConnectionFeature>(connectionFeature);
@@ -327,7 +328,7 @@ namespace FubarDev.FtpServer
 
                 // Connection information
                 var connectionFeature = Features.Get<IConnectionFeature>();
-                _logger?.LogInformation($"Connected from {connectionFeature.RemoteEndPoint}");
+                _logger?.LogInformation("Connected from {remoteIp}", connectionFeature.RemoteEndPoint);
 
                 await _streamWriterService.StartAsync(CancellationToken.None)
                    .ConfigureAwait(false);
@@ -355,12 +356,13 @@ namespace FubarDev.FtpServer
                .ConfigureAwait(false);
             if (!success)
             {
+                // Handles recursion caused by CommandChannelDispatcherAsync.
                 return;
             }
 
             try
             {
-                _logger?.LogTrace(" StopAsync called");
+                _logger?.LogTrace("StopAsync called");
 
                 await _serviceControl.WaitAsync().ConfigureAwait(false);
                 try
@@ -389,15 +391,42 @@ namespace FubarDev.FtpServer
 
                         await _networkStreamFeature.SecureConnectionAdapter.StopAsync(CancellationToken.None)
                            .ConfigureAwait(false);
-                        await _streamWriterService.StopAsync(CancellationToken.None)
-                           .ConfigureAwait(false);
                         await _streamReaderService.StopAsync(CancellationToken.None)
+                           .ConfigureAwait(false);
+                        await _streamWriterService.StopAsync(CancellationToken.None)
                            .ConfigureAwait(false);
                     }
                     catch (Exception ex)
                     {
                         // Something went wrong... badly!
                         _logger?.LogError(ex, ex.Message);
+                    }
+
+                    // Dispose all features (if disposable)
+                    foreach (var featureItem in Features)
+                    {
+                        try
+                        {
+                            switch (featureItem.Value)
+                            {
+                                case IFtpConnection _:
+                                    // Never dispose the connection itself.
+                                    break;
+                                case IFtpDataConnectionFeature feature:
+                                    await feature.DisposeAsync().ConfigureAwait(false);
+                                    break;
+                                case IDisposable disposable:
+                                    disposable.Dispose();
+                                    break;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            // Ignore exceptions
+                            _logger?.LogWarning(ex, "Failed to dispose feature of type {featureType}: {errorMessage}", featureItem.Key, ex.Message);
+                        }
+
+                        Features[featureItem.Key] = null;
                     }
 
                     _logger?.LogInformation("Connection closed");
@@ -485,6 +514,35 @@ namespace FubarDev.FtpServer
                 Abort();
             }
 
+            // HINT: This code is now used in three different places:
+            // - FtpConnection.StopAsync
+            // - FtpConnection.Dispose
+            // - ReinCommandHandler.Process
+            //
+            // We really need to clean up this mess!
+            // Dispose all features (if disposable)
+            foreach (var featureItem in Features)
+            {
+                try
+                {
+                    // TODO: Call DisposeAsync on platforms supporting IAsyncDisposable.
+                    switch (featureItem.Value)
+                    {
+                        case IFtpConnection _:
+                            // Never dispose the connection itself.
+                            break;
+                        case IDisposable disposable:
+                            disposable.Dispose();
+                            break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Ignore exceptions
+                    _logger?.LogWarning(ex, "Failed to dispose feature of type {featureType}: {errorMessage}", featureItem.Key, ex.Message);
+                }
+            }
+
             _socket.Dispose();
             _cancellationTokenSource.Dispose();
 #pragma warning disable 618
@@ -505,7 +563,7 @@ namespace FubarDev.FtpServer
             }
         }
 
-        private void Abort()
+        internal void Abort()
         {
             if (_connectionClosing)
             {
@@ -514,26 +572,6 @@ namespace FubarDev.FtpServer
 
             _connectionClosing = true;
             _cancellationTokenSource.Cancel(true);
-
-            // Dispose all features (if disposable)
-            foreach (var featureItem in Features)
-            {
-                if (featureItem.Value is FtpConnection)
-                {
-                    // Never dispose the connection itself.
-                    continue;
-                }
-
-                try
-                {
-                    (featureItem.Value as IDisposable)?.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    // Ignore exceptions
-                    _logger?.LogWarning(ex, "Failed to feature of type {featureType}: {errorMessage}", featureItem.Key, ex.Message);
-                }
-            }
         }
 
         /// <summary>
@@ -604,7 +642,17 @@ namespace FubarDev.FtpServer
             finally
             {
                 _logger?.LogDebug("Stopped sending responses");
-                _cancellationTokenSource.Cancel();
+                try
+                {
+                    _cancellationTokenSource.Cancel();
+                }
+                catch (ObjectDisposedException)
+                {
+                    // This might happen if the command handler stopped the connection.
+                    // Usual reasons are:
+                    // - Closing the connection was requested by the client
+                    // - Closing the connection was forced due to an FTP status 421
+                }
             }
         }
 
@@ -870,9 +918,9 @@ namespace FubarDev.FtpServer
                 var readTask = Stream
                    .ReadAsync(buffer, offset, length, cancellationToken);
 
-                // We ensure that this service can be closed ASAP with the help
-                // of a Task.Delay.
-                var resultTask = await Task.WhenAny(readTask, Task.Delay(-1, cancellationToken))
+                var tcs = new TaskCompletionSource<object?>();
+                using var registration = cancellationToken.Register(() => tcs.TrySetResult(null));
+                var resultTask = await Task.WhenAny(readTask, tcs.Task)
                    .ConfigureAwait(false);
                 if (resultTask != readTask || cancellationToken.IsCancellationRequested)
                 {
@@ -880,7 +928,13 @@ namespace FubarDev.FtpServer
                     return 0;
                 }
 
-                return readTask.Result;
+#if NETSTANDARD1_3
+                return await readTask.ConfigureAwait(false);
+#else
+                var result = readTask.Result;
+                readTask.Dispose();
+                return result;
+#endif
             }
 
             /// <inheritdoc />
